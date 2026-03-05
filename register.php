@@ -1,3 +1,64 @@
+<?php
+require_once __DIR__ . '/auth.php';
+
+// If already logged in, send user away from registration.
+if (isset($_SESSION['user_id'])) {
+    $role = current_user_role();
+    if ($role === 'admin') {
+        header('Location: admin_dashboard.php');
+    } elseif ($role === 'driver') {
+        header('Location: driver_dashboard.php');
+    } else {
+        header('Location: user_dashboard.php');
+    }
+    exit;
+}
+
+$form_values = [
+    'fullname' => '',
+    'phone'    => '',
+    'email'    => '',
+    'role'     => '',
+];
+
+$register_error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $form_values['fullname'] = trim($_POST['fullname'] ?? '');
+    $form_values['phone']    = trim($_POST['phone'] ?? '');
+    $form_values['email']    = trim($_POST['email'] ?? '');
+    $password                = $_POST['password'] ?? '';
+    $confirm_password        = $_POST['confirm_password'] ?? '';
+    $form_values['role']     = $_POST['role'] ?? '';
+
+    if (
+        $form_values['fullname'] === '' ||
+        $form_values['phone'] === '' ||
+        $form_values['email'] === '' ||
+        $password === '' ||
+        $confirm_password === '' ||
+        $form_values['role'] === ''
+    ) {
+        $register_error = 'Please fill in all required fields.';
+    } elseif (!filter_var($form_values['email'], FILTER_VALIDATE_EMAIL)) {
+        $register_error = 'Please enter a valid email address.';
+    } elseif (strlen($password) < 6) {
+        $register_error = 'Password must be at least 6 characters.';
+    } elseif ($password !== $confirm_password) {
+        $register_error = 'Passwords do not match.';
+    } else {
+        // Map front-end role to DB role names.
+        $role = $form_values['role'] === 'driver' ? 'driver' : 'patient';
+
+        if (!create_user($form_values['fullname'], $form_values['email'], $form_values['phone'], $password, $role)) {
+            $register_error = 'Could not create account. Email or phone may already be registered.';
+        } else {
+            header('Location: login.php?registered=1');
+            exit;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,7 +143,6 @@
       padding: 2.5rem;
     }
 
-    /* Darker labels for better visibility on registration form */
     .register-body .form-group label {
       color: #212529;
       font-weight: 600;
@@ -92,11 +152,13 @@
     .form-group select {
       background-color: #f8f9fa;
       border: 1px solid #e9ecef;
+      color: #212529;
     }
 
     .form-group input:focus,
     .form-group select:focus {
       background-color: white;
+      color: #212529;
     }
 
     .terms-check {
@@ -176,6 +238,14 @@
     .login-link a:hover {
       text-decoration: underline;
     }
+
+    .global-message {
+      margin-bottom: 1rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #e63946;
+    }
   </style>
 </head>
 <body>
@@ -190,25 +260,52 @@
 
       <!-- Register Form -->
       <div class="register-body">
-        <form id="registerForm" class="needs-validation">
+        <?php if ($register_error !== ''): ?>
+          <div class="global-message">
+            <?php echo htmlspecialchars($register_error, ENT_QUOTES, 'UTF-8'); ?>
+          </div>
+        <?php endif; ?>
+
+        <form id="registerForm" class="needs-validation" method="post" action="register.php" novalidate>
           <!-- Full Name -->
           <div class="form-group">
             <label for="fullname">Full Name</label>
-            <input type="text" id="fullname" name="fullname" placeholder="Enter your full name" required>
+            <input
+              type="text"
+              id="fullname"
+              name="fullname"
+              placeholder="Enter your full name"
+              required
+              value="<?php echo htmlspecialchars($form_values['fullname'], ENT_QUOTES, 'UTF-8'); ?>"
+            >
             <div class="form-error"></div>
           </div>
 
           <!-- Phone Number -->
           <div class="form-group">
             <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="Enter your phone number"
+              required
+              value="<?php echo htmlspecialchars($form_values['phone'], ENT_QUOTES, 'UTF-8'); ?>"
+            >
             <div class="form-error"></div>
           </div>
 
           <!-- Email -->
           <div class="form-group">
             <label for="email">Email Address</label>
-            <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="Enter your email address"
+              required
+              value="<?php echo htmlspecialchars($form_values['email'], ENT_QUOTES, 'UTF-8'); ?>"
+            >
             <div class="form-error"></div>
           </div>
 
@@ -231,8 +328,12 @@
             <label for="role">Register As</label>
             <select id="role" name="role" required>
               <option value="">Select your role</option>
-              <option value="user">User (Patient/Requester)</option>
-              <option value="driver">Driver (Ambulance Driver)</option>
+              <option value="patient" <?php echo $form_values['role'] === 'patient' ? 'selected' : ''; ?>>
+                User (Patient/Requester)
+              </option>
+              <option value="driver" <?php echo $form_values['role'] === 'driver' ? 'selected' : ''; ?>>
+                Driver (Ambulance Driver)
+              </option>
             </select>
             <div class="form-error"></div>
           </div>
@@ -251,7 +352,7 @@
 
         <!-- Login Link -->
         <div class="login-link">
-          <p>Already have an account? <a href="login.html">Login here</a></p>
+          <p>Already have an account? <a href="login.php">Login here</a></p>
         </div>
 
         <!-- Divider -->
@@ -259,7 +360,7 @@
 
         <!-- Back Home -->
         <div class="back-home">
-          <a href="index.html">
+          <a href="index.php">
             <i class="fas fa-home"></i> Back to Home
           </a>
         </div>
@@ -283,3 +384,4 @@
   <script src="js/script.js"></script>
 </body>
 </html>
+

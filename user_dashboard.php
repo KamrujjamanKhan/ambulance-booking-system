@@ -1,3 +1,9 @@
+<?php
+require_once __DIR__ . '/auth.php';
+require_role(['patient']);
+
+$current_name = current_user_name() ?? 'User';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +20,7 @@
        ============================================ -->
   <nav class="navbar navbar-expand-lg">
     <div class="container-with-gaps">
-      <a class="navbar-brand" href="index.html">
+      <a class="navbar-brand" href="index.php">
         <span class="navbar-logo-icon">
           <i class="fas fa-ambulance"></i>
         </span>
@@ -26,13 +32,13 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
-            <a class="nav-link" href="index.html">Home</a>
+            <a class="nav-link" href="index.php">Home</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="#bookings">My Bookings</a>
           </li>
           <li class="nav-item">
-            <span class="nav-link">Welcome, User</span>
+            <span class="nav-link">Welcome, <?php echo htmlspecialchars($current_name, ENT_QUOTES, 'UTF-8'); ?></span>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="#" onclick="logout(); return false;">Logout</a>

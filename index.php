@@ -1,3 +1,10 @@
+<?php
+require_once __DIR__ . '/auth.php';
+
+$is_logged_in = isset($_SESSION['user_id']);
+$current_role = current_user_role();
+$current_name = current_user_name();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,7 +22,7 @@
        ============================================ -->
   <nav class="navbar navbar-expand-lg">
     <div class="container-with-gaps">
-      <a class="navbar-brand" href="index.html">
+      <a class="navbar-brand" href="index.php">
         <span class="navbar-logo-icon">
           <i class="fas fa-ambulance"></i>
         </span>
@@ -43,8 +50,19 @@
           </li>
         </ul>
         <div class="ms-3">
-          <a href="login.html" class="btn btn-login">Login</a>
-          <a href="register.html" class="btn btn-register">Register</a>
+          <?php if ($is_logged_in): ?>
+            <?php if ($current_role === 'admin'): ?>
+              <a href="admin_dashboard.php" class="btn btn-login">Admin Dashboard</a>
+            <?php elseif ($current_role === 'driver'): ?>
+              <a href="driver_dashboard.php" class="btn btn-login">Driver Dashboard</a>
+            <?php else: ?>
+              <a href="user_dashboard.php" class="btn btn-login">My Dashboard</a>
+            <?php endif; ?>
+            <a href="logout.php" class="btn btn-register">Logout</a>
+          <?php else: ?>
+            <a href="login.php" class="btn btn-login">Login</a>
+            <a href="register.php" class="btn btn-register">Register</a>
+          <?php endif; ?>
         </div>
       </div>
     </div>
@@ -64,9 +82,15 @@
           <p class="hero-subtitle">Professional ambulance services with advanced life support. When every second counts, trust AmbulanceHub for rapid response and expert care.</p>
           
           <div class="hero-buttons">
-            <a href="a_booking.html" class="btn btn-hero-primary">
-              <i class="fas fa-phone"></i> Book Ambulance Now
-            </a>
+            <?php if ($is_logged_in && $current_role === 'patient'): ?>
+              <a href="a_booking.php" class="btn btn-hero-primary">
+                <i class="fas fa-phone"></i> Book Ambulance Now
+              </a>
+            <?php else: ?>
+              <a href="login.php" class="btn btn-hero-primary">
+                <i class="fas fa-phone"></i> Book Ambulance Now
+              </a>
+            <?php endif; ?>
             <a href="#services" class="btn btn-hero-secondary">
               <i class="fas fa-arrow-right"></i> Learn More
             </a>
@@ -337,3 +361,4 @@
   <script src="js/script.js"></script>
 </body>
 </html>
+

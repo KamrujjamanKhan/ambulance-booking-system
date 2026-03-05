@@ -31,7 +31,10 @@ class FormValidator {
     const errorElements = this.form.querySelectorAll('.form-error');
     errorElements.forEach(el => {
       el.textContent = '';
-      el.closest('.form-group').classList.remove('error');
+      const container = el.closest('.form-group') || el.closest('.terms-check');
+      if (container) {
+        container.classList.remove('error');
+      }
     });
   }
 
@@ -45,8 +48,15 @@ class FormValidator {
   }
 
   validateField(field) {
+    if (field.type === 'checkbox') {
+      if (field.required && !field.checked) {
+        this.showError(field, 'This field is required');
+        return false;
+      }
+      return true;
+    }
+
     const value = field.value.trim();
-    const errorElement = field.closest('.form-group').querySelector('.form-error');
     
     if (!value) {
       this.showError(field, 'This field is required');
@@ -90,21 +100,30 @@ class FormValidator {
   }
 
   showError(field, message) {
-    const errorElement = field.closest('.form-group').querySelector('.form-error');
-    if (errorElement) {
+    const container = field.closest('.form-group') || field.closest('.terms-check');
+    if (container) {
+      let errorElement = container.querySelector('.form-error');
+      if (!errorElement) {
+        errorElement = document.createElement('div');
+        errorElement.className = 'form-error';
+        container.appendChild(errorElement);
+      }
       errorElement.textContent = message;
-      field.closest('.form-group').classList.add('error');
+      container.classList.add('error');
     }
   }
 
   submitForm() {
     const formType = this.form.id;
-    
-    if (formType === 'loginForm') {
-      this.handleLogin();
-    } else if (formType === 'registerForm') {
-      this.handleRegister();
-    } else if (formType === 'bookingForm') {
+
+    // For authentication forms, let the browser submit to PHP backend
+    if (formType === 'loginForm' || formType === 'registerForm') {
+      this.form.submit();
+      return;
+    }
+
+    // For other forms we keep the existing front-end only behaviour
+    if (formType === 'bookingForm') {
       this.handleBooking();
     } else if (formType === 'contactForm') {
       this.handleContact();
@@ -124,7 +143,7 @@ class FormValidator {
       hideLoadingOverlay();
       showToast('Login successful! Redirecting...', 'success');
       setTimeout(() => {
-        window.location.href = 'user_dashboard.html';
+        window.location.href = 'user_dashboard.php';
       }, 1500);
     }, 1500);
   }
@@ -144,7 +163,7 @@ class FormValidator {
       hideLoadingOverlay();
       showToast('Registration successful! Redirecting to login...', 'success');
       setTimeout(() => {
-        window.location.href = 'login.html';
+        window.location.href = 'login.php';
       }, 1500);
     }, 1500);
   }
@@ -351,18 +370,8 @@ function getStatusBadgeClass(status) {
 }
 
 function logout() {
-  showLoadingOverlay();
-  
-  // TODO: Replace with actual API endpoint
-  // POST /api/logout.php
-  
-  setTimeout(() => {
-    hideLoadingOverlay();
-    showToast('Logged out successfully', 'success');
-    setTimeout(() => {
-      window.location.href = 'index.html';
-    }, 1000);
-  }, 1000);
+  // Let PHP handle session destruction and redirect.
+  window.location.href = 'logout.php';
 }
 
 // ============================================

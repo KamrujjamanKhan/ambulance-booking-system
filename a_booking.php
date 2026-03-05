@@ -1,3 +1,11 @@
+<?php
+require_once __DIR__ . '/auth.php';
+
+// Only logged-in patients can access the booking form.
+require_role(['patient']);
+
+$current_name = current_user_name() ?? '';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,7 +113,6 @@
       background-color: white;
     }
 
-    /* Make date & time text more visible */
     input[type="date"],
     input[type="time"] {
       color: #212529;
@@ -163,15 +170,6 @@
       background-color: #f8f9fa;
     }
 
-    .login-link a {
-      color: #e63946;
-      font-weight: 700;
-    }
-
-    .login-link a:hover {
-      text-decoration: underline;
-    }
-
     .divider {
       text-align: center;
       margin: 1.5rem 0;
@@ -214,11 +212,18 @@
           <p><i class="fas fa-clock"></i> 24/7 service &nbsp; • &nbsp; <i class="fas fa-map-marker-alt"></i> All over Bangladesh</p>
         </div>
 
-        <form id="ambulanceBookingForm" class="needs-validation">
+        <form id="bookingForm" class="needs-validation" method="post" action="a_booking.php" novalidate>
           <!-- Your Name -->
           <div class="form-group">
             <label for="patient_name">Your Name</label>
-            <input type="text" id="patient_name" name="patient_name" placeholder="Enter your name" required>
+            <input
+              type="text"
+              id="patient_name"
+              name="patient_name"
+              placeholder="Enter your name"
+              required
+              value="<?php echo htmlspecialchars($current_name, ENT_QUOTES, 'UTF-8'); ?>"
+            >
             <div class="form-error"></div>
           </div>
 
@@ -296,15 +301,11 @@
         <!-- Divider -->
         <div class="divider">or</div>
 
-        <!-- Back & Login Links -->
+        <!-- Back & Dashboard Links -->
         <div class="back-home">
-          <a href="index.html">
-            <i class="fas fa-home"></i> Back to Home
+          <a href="user_dashboard.php">
+            <i class="fas fa-home"></i> Back to Dashboard
           </a>
-        </div>
-
-        <div class="login-link">
-          <p>Already have an account? <a href="login.html">Login to view your bookings</a></p>
         </div>
       </div>
     </div>

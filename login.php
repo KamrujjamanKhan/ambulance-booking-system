@@ -1,3 +1,53 @@
+<?php
+require_once __DIR__ . '/auth.php';
+
+// If already logged in, send user to their dashboard directly.
+if (isset($_SESSION['user_id'])) {
+    $role = current_user_role();
+    if ($role === 'admin') {
+        header('Location: admin_dashboard.php');
+    } elseif ($role === 'driver') {
+        header('Location: driver_dashboard.php');
+    } else {
+        header('Location: user_dashboard.php');
+    }
+    exit;
+}
+
+$identifier  = '';
+$login_error = '';
+$login_success = '';
+
+if (isset($_GET['registered']) && $_GET['registered'] === '1') {
+    $login_success = 'Registration successful. Please log in.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $identifier = trim($_POST['email'] ?? '');
+    $password   = $_POST['password'] ?? '';
+
+    if ($identifier === '' || $password === '') {
+        $login_error = 'Please fill in both fields.';
+    } else {
+        $user = find_user_by_identifier($identifier);
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            $login_error = 'Invalid email/phone or password.';
+        } else {
+            login_user($user);
+
+            // Redirect based on role.
+            if ($user['role'] === 'admin') {
+                header('Location: admin_dashboard.php');
+            } elseif ($user['role'] === 'driver') {
+                header('Location: driver_dashboard.php');
+            } else {
+                header('Location: user_dashboard.php');
+            }
+            exit;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -84,7 +134,6 @@
       padding: 2.5rem;
     }
 
-    /* Make form labels slightly darker for better readability on light background */
     .login-body .form-group label {
       color: #212529;
       font-weight: 600;
@@ -93,10 +142,12 @@
     .form-group input {
       background-color: #f8f9fa;
       border: 1px solid #e9ecef;
+      color: #212529;
     }
 
     .form-group input:focus {
       background-color: white;
+      color: #212529;
     }
 
     .forgot-password {
@@ -174,6 +225,21 @@
     .register-link a:hover {
       text-decoration: underline;
     }
+
+    .global-message {
+      margin-bottom: 1rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .global-message.error {
+      color: #e63946;
+    }
+
+    .global-message.success {
+      color: #198754;
+    }
   </style>
 </head>
 <body>
@@ -188,11 +254,28 @@
 
       <!-- Login Form -->
       <div class="login-body">
-        <form id="loginForm" class="needs-validation">
+        <?php if ($login_error !== ''): ?>
+          <div class="global-message error">
+            <?php echo htmlspecialchars($login_error, ENT_QUOTES, 'UTF-8'); ?>
+          </div>
+        <?php elseif ($login_success !== ''): ?>
+          <div class="global-message success">
+            <?php echo htmlspecialchars($login_success, ENT_QUOTES, 'UTF-8'); ?>
+          </div>
+        <?php endif; ?>
+
+        <form id="loginForm" class="needs-validation" method="post" action="login.php" novalidate>
           <!-- Email/Phone Input -->
           <div class="form-group">
             <label for="email">Email or Phone Number</label>
-            <input type="text" id="email" name="email" placeholder="Enter your email or phone" required>
+            <input
+              type="text"
+              id="email"
+              name="email"
+              placeholder="Enter your email or phone"
+              required
+              value="<?php echo htmlspecialchars($identifier, ENT_QUOTES, 'UTF-8'); ?>"
+            >
             <div class="form-error"></div>
           </div>
 
@@ -222,7 +305,7 @@
 
         <!-- Register Link -->
         <div class="register-link">
-          <p>Don't have an account? <a href="register.html">Create one now</a></p>
+          <p>Don't have an account? <a href="register.php">Create one now</a></p>
         </div>
 
         <!-- Divider -->
@@ -230,7 +313,7 @@
 
         <!-- Back Home -->
         <div class="back-home">
-          <a href="index.html">
+          <a href="index.php">
             <i class="fas fa-home"></i> Back to Home
           </a>
         </div>
@@ -254,3 +337,4 @@
   <script src="js/script.js"></script>
 </body>
 </html>
+
