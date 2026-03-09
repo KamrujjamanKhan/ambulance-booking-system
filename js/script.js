@@ -21,7 +21,7 @@ class FormValidator {
     this.isValid = true;
     this.clearErrors();
     this.validateForm();
-    
+
     if (this.isValid) {
       this.submitForm();
     }
@@ -57,7 +57,7 @@ class FormValidator {
     }
 
     const value = field.value.trim();
-    
+
     if (!value) {
       this.showError(field, 'This field is required');
       return false;
@@ -116,16 +116,14 @@ class FormValidator {
   submitForm() {
     const formType = this.form.id;
 
-    // For authentication forms, let the browser submit to PHP backend
-    if (formType === 'loginForm' || formType === 'registerForm') {
+    // For authentication and booking forms, let the browser submit to PHP backend
+    if (formType === 'loginForm' || formType === 'registerForm' || formType === 'bookingForm') {
       this.form.submit();
       return;
     }
 
     // For other forms we keep the existing front-end only behaviour
-    if (formType === 'bookingForm') {
-      this.handleBooking();
-    } else if (formType === 'contactForm') {
+    if (formType === 'contactForm') {
       this.handleContact();
     }
   }
@@ -136,7 +134,7 @@ class FormValidator {
     const rememberMe = this.form.querySelector('#remember').checked;
 
     showLoadingOverlay();
-    
+
     // TODO: Replace with actual API endpoint
     // POST /api/login.php
     setTimeout(() => {
@@ -156,7 +154,7 @@ class FormValidator {
     const role = this.form.querySelector('#role').value;
 
     showLoadingOverlay();
-    
+
     // TODO: Replace with actual API endpoint
     // POST /api/register.php
     setTimeout(() => {
@@ -168,29 +166,6 @@ class FormValidator {
     }, 1500);
   }
 
-  handleBooking() {
-    const patientName = this.form.querySelector('#patient_name').value;
-    const phone = this.form.querySelector('#phone').value;
-    const pickupAddress = this.form.querySelector('#pickup_address').value;
-    const destinationHospital = this.form.querySelector('#destination_hospital').value;
-    const city = this.form.querySelector('#city').value;
-    const ambulanceType = this.form.querySelector('#ambulance_type').value;
-    const isEmergency = this.form.querySelector('#is_emergency').checked;
-    const needOxygen = this.form.querySelector('#need_oxygen').checked;
-    const needVentilator = this.form.querySelector('#need_ventilator').checked;
-    const notes = this.form.querySelector('#notes').value;
-
-    showLoadingOverlay();
-    
-    // TODO: Replace with actual API endpoint
-    // POST /api/book_ambulance.php
-    setTimeout(() => {
-      hideLoadingOverlay();
-      showToast('Ambulance booked successfully! Driver assigned.', 'success');
-      this.form.reset();
-    }, 1500);
-  }
-
   handleContact() {
     const name = this.form.querySelector('#name').value;
     const email = this.form.querySelector('#email').value;
@@ -198,7 +173,7 @@ class FormValidator {
     const message = this.form.querySelector('#message').value;
 
     showLoadingOverlay();
-    
+
     // TODO: Replace with actual API endpoint
     // POST /api/contact.php
     setTimeout(() => {
@@ -215,10 +190,10 @@ class FormValidator {
 
 function showToast(message, type = 'info', duration = 3000) {
   const container = document.querySelector('.toast-container');
-  
+
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  
+
   const icons = {
     success: 'fas fa-check-circle',
     error: 'fas fa-times-circle',
@@ -282,23 +257,85 @@ function initializeMap() {
     maxZoom: 19
   }).addTo(map);
 
-  // Map click handler for location selection
-  map.on('click', function(e) {
-    const pickupInput = document.getElementById('pickup');
-    const destinationInput = document.getElementById('destination');
+  // Handle logic differently based on whether it's booking form or driver dashboard
+  const isBooking = document.getElementById('bookingForm') !== null;
+  let selectingPickup = true;
 
-    if (pickupInput && !pickupInput.value) {
-      // Set pickup location
-      pickupMarker = L.marker(e.latlng).addTo(map);
-      pickupInput.value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-      showToast('Pickup location set', 'success');
-    } else if (destinationInput && !destinationInput.value) {
-      // Set destination location
-      destinationMarker = L.marker(e.latlng).addTo(map);
-      destinationInput.value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-      showToast('Destination location set', 'success');
+  if (isBooking) {
+    // Helper for fetching place name
+    function geocodeAndUpdate(latlng, inputElement, typeName) {
+      inputElement.value = 'Fetching location...';
+      showToast(`Fetching ${typeName} location name...`, 'info');
+
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.display_name) {
+            inputElement.value = data.display_name;
+            showToast(`${typeName} location set`, 'success');
+          } else {
+            inputElement.value = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+            showToast('Location set as coordinates', 'success');
+          }
+        }).catch(err => {
+          console.error(err);
+          inputElement.value = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+          showToast('Ready', 'success');
+        });
     }
-  });
+
+    // Advanced booking map with reverse geocoding and color markers
+    map.on('click', function (e) {
+      const pickupInput = document.getElementById('pickup');
+      const destinationInput = document.getElementById('destination');
+
+      if (selectingPickup) {
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        pickupMarker = L.marker(e.latlng, {
+          draggable: true,
+          icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41]
+          })
+        }).addTo(map).bindPopup('Pickup (Drag to adjust)').openPopup();
+
+        pickupMarker.on('dragend', function (event) {
+          geocodeAndUpdate(event.target.getLatLng(), pickupInput, 'Pickup');
+        });
+
+        geocodeAndUpdate(e.latlng, pickupInput, 'Pickup');
+        selectingPickup = false;
+      } else {
+        if (destinationMarker) map.removeLayer(destinationMarker);
+        destinationMarker = L.marker(e.latlng, {
+          draggable: true,
+          icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41]
+          })
+        }).addTo(map).bindPopup('Destination (Drag to adjust)').openPopup();
+
+        destinationMarker.on('dragend', function (event) {
+          geocodeAndUpdate(event.target.getLatLng(), destinationInput, 'Destination');
+        });
+
+        geocodeAndUpdate(e.latlng, destinationInput, 'Destination');
+        selectingPickup = true;
+      }
+    });
+
+    // Reset selection if input clicked directly
+    const pInput = document.getElementById('pickup');
+    const dInput = document.getElementById('destination');
+    if (pInput) pInput.addEventListener('focus', () => selectingPickup = true);
+    if (dInput) dInput.addEventListener('focus', () => selectingPickup = false);
+
+  } else {
+    // Simple map handler for driver dashboard (only updating current location)
+    // Driver dashboard usually doesn't need to click to pick locations, but just in case
+  }
 }
 
 // ============================================
@@ -308,25 +345,25 @@ function initializeMap() {
 function updateDriverLocation() {
   if (navigator.geolocation) {
     showLoadingOverlay();
-    
+
     navigator.geolocation.getCurrentPosition(
-      function(position) {
+      function (position) {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        
+
         // TODO: Replace with actual API endpoint
         // POST /api/update_location.php
-        
+
         hideLoadingOverlay();
         showToast(`Location updated: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
-        
+
         // Update map if it exists
         if (map) {
           map.setView([lat, lng], 15);
           L.marker([lat, lng]).addTo(map).bindPopup('Your current location');
         }
       },
-      function(error) {
+      function (error) {
         hideLoadingOverlay();
         showToast('Unable to get your location. Please enable location services.', 'error');
       }
@@ -379,7 +416,7 @@ function logout() {
 // ============================================
 
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-  anchor.addEventListener('click', function(e) {
+  anchor.addEventListener('click', function (e) {
     const href = this.getAttribute('href');
     if (href !== '#' && document.querySelector(href)) {
       e.preventDefault();
@@ -397,7 +434,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 
 window.addEventListener('scroll', () => {
   const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
-  
+
   navLinks.forEach(link => {
     const href = link.getAttribute('href');
     if (href && href.startsWith('#')) {
@@ -418,7 +455,7 @@ window.addEventListener('scroll', () => {
 // ============================================
 
 document.querySelectorAll('.sidebar-menu a').forEach(link => {
-  link.addEventListener('click', function() {
+  link.addEventListener('click', function () {
     document.querySelectorAll('.sidebar-menu a').forEach(l => l.classList.remove('active'));
     this.classList.add('active');
   });
@@ -433,16 +470,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('loginForm')) {
     new FormValidator('loginForm');
   }
-  
+
   if (document.getElementById('registerForm')) {
     new FormValidator('registerForm');
   }
-  
+
   if (document.getElementById('bookingForm')) {
     new FormValidator('bookingForm');
     initializeMap();
   }
-  
+
   if (document.getElementById('contactForm')) {
     new FormValidator('contactForm');
   }

@@ -19,38 +19,28 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Example admin user. Password: admin123
-INSERT INTO `users` (`full_name`, `email`, `phone`, `password_hash`, `role`, `created_at`)
-VALUES (
-  'Site Administrator',
-  'admin@example.com',
-  '+8801000000000',
-  '$2y$10$R62Uu46DDCKcy86B1mMfp.T9TK82U7wOG0frNdM5Dsi4hGkxCRxE.',
-  'admin',
-  NOW()
-)
-ON DUPLICATE KEY UPDATE email = email;
+CREATE TABLE IF NOT EXISTS `ambulances` (
+  `id`            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `driver_id`     INT UNSIGNED NOT NULL,
+  `vehicle_type`  VARCHAR(100) NOT NULL,
+  `license_plate` VARCHAR(50) NOT NULL UNIQUE,
+  `status`        ENUM('Available', 'Busy', 'Offline') NOT NULL DEFAULT 'Offline',
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`driver_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Example patient user. Password: patient01
-INSERT INTO `users` (`full_name`, `email`, `phone`, `password_hash`, `role`, `created_at`)
-VALUES (
-  'Patient X',
-  'patient01@gmail.com',
-  '01789000000',
-  '$2y$10$FL8pAshoKFdSxWgW7usuH.PnFiHezIO67d1WsPDUUKjwG2RSGu4Le',
-  'patient',
-  NOW()
-)
-ON DUPLICATE KEY UPDATE email = email;
+CREATE TABLE IF NOT EXISTS `bookings` (
+  `id`                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `patient_id`        INT UNSIGNED NOT NULL,
+  `driver_id`         INT UNSIGNED DEFAULT NULL,
+  `pickup_location`   VARCHAR(255) NOT NULL,
+  `destination`       VARCHAR(255) NOT NULL,
+  `status`            ENUM('Pending', 'Accepted', 'On the way', 'Arrived', 'Completed', 'Cancelled') NOT NULL DEFAULT 'Pending',
+  `emergency_details` TEXT,
+  `created_at`        DATETIME NOT NULL,
+  `updated_at`        DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`patient_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`driver_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Example driver user. Password: driver01
-INSERT INTO `users` (`full_name`, `email`, `phone`, `password_hash`, `role`, `created_at`)
-VALUES (
-  'Driver X',
-  'driver01@gmail.com',
-  '01890000000',
-  '$2y$10$06sg3UHJ2DVgoskOh6gkgeR3FFhIuZwvx8JwRASBpjuiE9eOhkWSq',
-  'driver',
-  NOW()
-)
-ON DUPLICATE KEY UPDATE email = email;

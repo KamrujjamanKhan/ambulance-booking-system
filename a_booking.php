@@ -1,10 +1,41 @@
 <?php
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/config.php';
 
 // Only logged-in patients can access the booking form.
 require_role(['patient']);
 
 $current_name = current_user_name() ?? '';
+$patient_id = $_SESSION['user_id'];
+
+$message = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $pickup = $_POST['pickup_location'] ?? '';
+  $destination = $_POST['destination'] ?? '';
+  $patient_name = $_POST['patient_name'] ?? '';
+  $contact_phone = $_POST['contact_phone'] ?? '';
+  $pickup_date = $_POST['pickup_date'] ?? '';
+  $pickup_time = $_POST['pickup_time'] ?? '';
+  $ambulance_type = $_POST['ambulance_type'] ?? '';
+  $patient_condition = $_POST['patient_condition'] ?? '';
+  
+  if (empty($pickup) || empty($destination)) {
+    $error = 'Pickup and destination are required.';
+  } else {
+    $details = "Name: $patient_name\nPhone: $contact_phone\nType: $ambulance_type\nDate: $pickup_date $pickup_time\nCondition: $patient_condition";
+    
+    try {
+      $stmt = db()->prepare("INSERT INTO bookings (patient_id, pickup_location, destination, status, emergency_details, created_at, updated_at) VALUES (?, ?, ?, 'Pending', ?, NOW(), NOW())");
+      $stmt->execute([$patient_id, $pickup, $destination, $details]);
+      
+      $message = "Booking request submitted successfully! We are finding an available ambulance for you.";
+    } catch (PDOException $e) {
+      $error = "An error occurred while submitting your request.";
+    }
+  }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -213,6 +244,18 @@ $current_name = current_user_name() ?? '';
         </div>
 
         <form id="bookingForm" class="needs-validation" method="post" action="a_booking.php" novalidate>
+          
+          <?php if ($message): ?>
+            <div class="alert alert-success" style="background:#d4edda; color:#155724; padding:10px; border-radius:5px; margin-bottom:15px;"><?php echo htmlspecialchars($message); ?></div>
+            <div style="text-align: center; margin-bottom: 20px;">
+              <a href="user_dashboard.php" class="btn btn-primary">Go to Dashboard</a>
+            </div>
+          <?php endif; ?>
+
+          <?php if ($error): ?>
+            <div class="alert alert-danger" style="background:#f8d7da; color:#721c24; padding:10px; border-radius:5px; margin-bottom:15px;"><?php echo htmlspecialchars($error); ?></div>
+          <?php endif; ?>
+
           <!-- Your Name -->
           <div class="form-group">
             <label for="patient_name">Your Name</label>
@@ -251,7 +294,8 @@ $current_name = current_user_name() ?? '';
           <!-- Map for selecting pickup & destination -->
           <div class="map-wrapper">
             <label style="display:block; font-weight:600; margin-bottom:0.5rem; color:#212529;">
-              Select locations on map (first click = pickup, second click = destination)
+              Select locations on map (first click = pickup, second click = destination).<br>
+              <small style="color:#6c757d; font-weight:normal;"><i>You can drag the markers to adjust them if you clicked the wrong place.</i></small>
             </label>
             <div id="map"></div>
           </div>
@@ -327,6 +371,11 @@ $current_name = current_user_name() ?? '';
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <!-- Custom JS -->
   <script src="js/script.js"></script>
+  <script>
+    // Map is now fully initialized and reverse geocoding is handled in js/script.js
+
+
+  </script>
 </body>
 </html>
 
