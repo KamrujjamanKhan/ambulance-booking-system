@@ -12,8 +12,13 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  require_csrf();
   $pickup = $_POST['pickup_location'] ?? '';
+  $pickup_lat = $_POST['pickup_lat'] ?? null;
+  $pickup_lng = $_POST['pickup_lng'] ?? null;
   $destination = $_POST['destination'] ?? '';
+  $dest_lat = $_POST['dest_lat'] ?? null;
+  $dest_lng = $_POST['dest_lng'] ?? null;
   $patient_name = $_POST['patient_name'] ?? '';
   $contact_phone = $_POST['contact_phone'] ?? '';
   $pickup_date = $_POST['pickup_date'] ?? '';
@@ -27,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $details = "Name: $patient_name\nPhone: $contact_phone\nType: $ambulance_type\nDate: $pickup_date $pickup_time\nCondition: $patient_condition";
     
     try {
-      $stmt = db()->prepare("INSERT INTO bookings (patient_id, pickup_location, destination, status, emergency_details, created_at, updated_at) VALUES (?, ?, ?, 'Pending', ?, NOW(), NOW())");
-      $stmt->execute([$patient_id, $pickup, $destination, $details]);
+      $stmt = db()->prepare("INSERT INTO bookings (patient_id, pickup_location, pickup_lat, pickup_lng, destination, dest_lat, dest_lng, status, emergency_details, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, NOW(), NOW())");
+      $stmt->execute([$patient_id, $pickup, $pickup_lat, $pickup_lng, $destination, $dest_lat, $dest_lng, $details]);
       
       $message = "Booking request submitted successfully! We are finding an available ambulance for you.";
     } catch (PDOException $e) {
@@ -244,6 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <form id="bookingForm" class="needs-validation" method="post" action="a_booking.php" novalidate>
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
           
           <?php if ($message): ?>
             <div class="alert alert-success" style="background:#d4edda; color:#155724; padding:10px; border-radius:5px; margin-bottom:15px;"><?php echo htmlspecialchars($message); ?></div>
@@ -280,14 +286,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <!-- Pickup Location -->
           <div class="form-group">
             <label for="pickup">Pickup Location</label>
-            <input type="text" id="pickup" name="pickup_location" placeholder="Click on map or type address" required>
+            <input type="text" id="pickup" name="pickup_location" placeholder="Click on map to select pickup location" required readonly style="background-color: #e9ecef; cursor: pointer;">
             <div class="form-error"></div>
           </div>
 
           <!-- Destination Hospital -->
           <div class="form-group">
             <label for="destination">Destination Hospital / Location</label>
-            <input type="text" id="destination" name="destination" placeholder="Click on map or type address" required>
+            <input type="text" id="destination" name="destination" placeholder="Click on map to select destination" required readonly style="background-color: #e9ecef; cursor: pointer;">
             <div class="form-error"></div>
           </div>
 
@@ -298,6 +304,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <small style="color:#6c757d; font-weight:normal;"><i>You can drag the markers to adjust them if you clicked the wrong place.</i></small>
             </label>
             <div id="map"></div>
+            <input type="hidden" id="pickup_lat" name="pickup_lat">
+            <input type="hidden" id="pickup_lng" name="pickup_lng">
+            <input type="hidden" id="dest_lat" name="dest_lat">
+            <input type="hidden" id="dest_lng" name="dest_lng">
           </div>
 
           <!-- Date & Time -->
@@ -370,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <!-- Font Awesome -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <!-- Custom JS -->
-  <script src="js/script.js"></script>
+  <script src="js/script.js?v=<?= time() ?>"></script>
   <script>
     // Map is now fully initialized and reverse geocoding is handled in js/script.js
 

@@ -25,6 +25,7 @@ $bookings = $stmt->fetchAll();
   <title>User Dashboard - AmbulanceHub</title>
   
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 </head>
 <body>
 
@@ -108,9 +109,55 @@ $bookings = $stmt->fetchAll();
                   </div>
                   <p class="mb-1"><strong>From:</strong> <?= htmlspecialchars($b['pickup_location']) ?></p>
                   <p class="mb-1"><strong>To:</strong> <?= htmlspecialchars($b['destination']) ?></p>
+
+                  <?php if (in_array($b['status'], ['Accepted', 'On the way', 'Arrived'], true)): ?>
+                    <div
+                      class="sim-track-box mt-3"
+                      data-tracking-booking-id="<?= (int)$b['id'] ?>"
+                      data-tracking-status="<?= htmlspecialchars($b['status']) ?>"
+                      data-tracking-progress="<?= (int)$b['simulated_progress'] ?>"
+                      data-tracking-eta="<?= $b['eta_minutes'] === null ? '' : (int)$b['eta_minutes'] ?>"
+                      data-p-lat="<?= htmlspecialchars($b['pickup_lat'] ?? '') ?>"
+                      data-p-lng="<?= htmlspecialchars($b['pickup_lng'] ?? '') ?>"
+                      data-d-lat="<?= htmlspecialchars($b['dest_lat'] ?? '') ?>"
+                      data-d-lng="<?= htmlspecialchars($b['dest_lng'] ?? '') ?>"
+                    >
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong><i class="fas fa-route"></i> Track & Arrive</strong>
+                        <span class="badge bg-dark tracking-status"><?= htmlspecialchars($b['status']) ?></span>
+                      </div>
+                      <?php if (!empty($b['pickup_lat']) && !empty($b['dest_lat'])): ?>
+                      <div id="user-map-<?= $b['id'] ?>" class="dashboard-map mb-2" style="height: 250px; border-radius: 8px; border: 1px solid #ccc;"></div>
+                      <?php endif; ?>
+                      <div class="sim-route mb-2">
+                        <span class="route-point start">Pickup</span>
+                        <span class="route-line">
+                          <span class="route-ambulance"><i class="fas fa-ambulance"></i></span>
+                        </span>
+                        <span class="route-point end">Hospital</span>
+                      </div>
+                      <div class="progress mb-2" style="height: 10px;">
+                        <div
+                          class="progress-bar progress-bar-striped progress-bar-animated bg-info tracking-progress-bar"
+                          role="progressbar"
+                          style="width: <?= (int)$b['simulated_progress'] ?>%;"
+                          aria-valuemin="0"
+                          aria-valuemax="100"
+                          aria-valuenow="<?= (int)$b['simulated_progress'] ?>"
+                        ></div>
+                      </div>
+                      <div class="d-flex justify-content-between small text-muted">
+                        <span class="tracking-progress-text"><?= (int)$b['simulated_progress'] ?>% completed</span>
+                        <span class="tracking-eta-text">
+                          <?= $b['eta_minutes'] === null ? 'ETA: --' : ('ETA: ~' . (int)$b['eta_minutes'] . ' min') ?>
+                        </span>
+                      </div>
+                    </div>
+                  <?php endif; ?>
                   
                   <?php if ($b['status'] === 'Pending'): ?>
                     <form method="post" action="user_action.php" class="mt-2">
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                       <input type="hidden" name="action" value="cancel_booking">
                       <input type="hidden" name="booking_id" value="<?= $b['id'] ?>">
                       <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to cancel this booking?');">Cancel Request</button>
@@ -144,10 +191,76 @@ $bookings = $stmt->fetchAll();
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <!-- Font Awesome -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <!-- Custom JS -->
-  <script src="js/script.js"></script>
+  <script src="js/script.js?v=<?= time() ?>"></script>
+  <script>
+    function renderTrackingCard(card, payload) {
+      const statusEl = card.querySelector('.tracking-status');
+      const progressBar = card.querySelector('.tracking-progress-bar');
+      const progressText = card.querySelector('.tracking-progress-text');
+      const etaText = card.querySelector('.tracking-eta-text');
+      const ambulanceIconWrap = card.querySelector('.route-ambulance');
+
+      const progress = Math.max(0, Math.min(100, parseInt(payload.progress || 0, 10)));
+      const status = payload.status || 'Accepted';
+      const eta = payload.eta_minutes;
+
+      statusEl.textContent = status;
+      progressBar.style.width = progress + '%';
+      progressBar.setAttribute('aria-valuenow', progress);
+      progressText.textContent = progress + '% completed';
+      etaText.textContent = eta === null ? 'ETA: --' : ('ETA: ~' + eta + ' min');
+      ambulanceIconWrap.style.left = progress + '%';
+
+      const bId = card.getAttribute('data-tracking-booking-id');
+      if (window.mapControllers && window.mapControllers[bId]) {
+         window.mapControllers[bId].updateProgress(progress);
+      }
+    }
+
+    function refreshTrackingCard(card) {
+      const bookingId = card.getAttribute('data-tracking-booking-id');
+      fetch('get_trip_progress.php?booking_id=' + encodeURIComponent(bookingId))
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success || !data.data) return;
+          renderTrackingCard(card, data.data);
+        })
+        .catch(() => {});
+    }
+
+    const trackingCards = document.querySelectorAll('[data-tracking-booking-id]');
+    window.mapControllers = {};
+
+    trackingCards.forEach(card => {
+      const bId = card.getAttribute('data-tracking-booking-id');
+      const pLat = parseFloat(card.getAttribute('data-p-lat'));
+      const pLng = parseFloat(card.getAttribute('data-p-lng'));
+      const dLat = parseFloat(card.getAttribute('data-d-lat'));
+      const dLng = parseFloat(card.getAttribute('data-d-lng'));
+
+      if (pLat && pLng && dLat && dLng) {
+         window.mapControllers[bId] = window.initDashboardMap('user-map-' + bId, pLat, pLng, dLat, dLng);
+      }
+
+      renderTrackingCard(card, {
+        status: card.getAttribute('data-tracking-status'),
+        progress: card.getAttribute('data-tracking-progress'),
+        eta_minutes: card.getAttribute('data-tracking-eta') === '' ? null : parseInt(card.getAttribute('data-tracking-eta'), 10)
+      });
+      refreshTrackingCard(card);
+    });
+
+    if (trackingCards.length > 0) {
+      setInterval(() => {
+        trackingCards.forEach(refreshTrackingCard);
+      }, 5000);
+    }
+  </script>
 </body>
 </html>
 

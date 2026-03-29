@@ -338,7 +338,7 @@ $current_name = current_user_name();
       </div>
 
       <div class="footer-bottom">
-        <p>&copy; 2024 AmbulanceHub. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a></p>
+        <p>&copy; 2026 AmbulanceHub. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms of Service</a></p>
       </div>
     </div>
   </footer>

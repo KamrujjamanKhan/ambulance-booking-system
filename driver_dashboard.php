@@ -50,6 +50,7 @@ $trip_history = $history_stmt->fetchAll();
   <title>Driver Dashboard - AmbulanceHub</title>
   
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 </head>
 <body>
 
@@ -105,6 +106,7 @@ $trip_history = $history_stmt->fetchAll();
             <i class="fas fa-home"></i> Back to Home
           </a>
           <form id="header-status-form" class="me-3 mb-0">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
             <select class="form-select form-select-sm" id="header-status" name="status" style="border-radius:20px; font-weight:bold; background-color: <?= $status === 'Available' ? '#10b981' : ($status === 'Busy' ? '#f59e0b' : '#6b7280') ?>; color: white; border: none; cursor:pointer;" onchange="updateHeaderStatus(this.value)">
               <option value="Offline" <?= $status === 'Offline' ? 'selected' : '' ?>>Offline</option>
               <option value="Available" <?= $status === 'Available' ? 'selected' : '' ?>>Available</option>
@@ -137,7 +139,77 @@ $trip_history = $history_stmt->fetchAll();
               <p><strong>Pickup:</strong> <?= htmlspecialchars($active_trip['pickup_location']) ?></p>
               <p><strong>Destination:</strong> <?= htmlspecialchars($active_trip['destination']) ?></p>
               <p><strong>Details:</strong><br><?= nl2br(htmlspecialchars($active_trip['emergency_details'])) ?></p>
+              <div class="sim-track-box mt-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <strong>Tracking</strong>
+                  <span class="badge bg-dark" id="driver-progress-label"><?= (int)$active_trip['simulated_progress'] ?>%</span>
+                </div>
+                <?php if (!empty($active_trip['pickup_lat']) && !empty($active_trip['dest_lat'])): ?>
+                <div id="driver-map" class="dashboard-map mb-2" style="height: 250px; border-radius: 8px; border: 1px solid #ccc;"></div>
+                <?php endif; ?>
+                <div class="progress mb-2" style="height: 10px;">
+                  <div
+                    class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                    id="driver-progress-bar"
+                    role="progressbar"
+                    style="width: <?= (int)$active_trip['simulated_progress'] ?>%;"
+                    aria-valuenow="<?= (int)$active_trip['simulated_progress'] ?>"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  ></div>
+                </div>
+                <small class="text-muted">Estimated arrival: <span id="driver-eta-label"><?= $active_trip['eta_minutes'] === null ? '-' : (int)$active_trip['eta_minutes'] . ' min' ?></span></small>
+              </div>
+
+              <?php if ($active_trip['status'] !== 'Arrived'): ?>
+              <form method="post" class="mt-3 mb-3" id="trip-progress-form">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="booking_id" value="<?= $active_trip['id'] ?>">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-7">
+                    <label class="form-label fw-semibold mb-1 d-flex justify-content-between align-items-center">
+                      <span>Progress</span>
+                      <span class="badge bg-secondary" id="trip-progress-live"><?= (int)$active_trip['simulated_progress'] ?>%</span>
+                    </label>
+                    <input
+                      type="range"
+                      class="form-range"
+                      name="progress"
+                      min="0"
+                      max="100"
+                      value="<?= (int)$active_trip['simulated_progress'] ?>"
+                      id="trip-progress-input"
+                    >
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-semibold mb-1">ETA (min)</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      name="eta_minutes"
+                      min="0"
+                      max="180"
+                      value="<?= $active_trip['eta_minutes'] === null ? '' : (int)$active_trip['eta_minutes'] ?>"
+                      id="trip-eta-input"
+                    >
+                  </div>
+                  <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-outline-primary" id="trip-progress-btn">Save</button>
+                  </div>
+                </div>
+              </form>
+              <div class="d-flex gap-2 mb-3">
+                <button type="button" class="btn btn-sm btn-primary" id="auto-sim-start-btn">
+                  <i class="fas fa-play"></i> Start Auto Simulate
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="auto-sim-stop-btn" disabled>
+                  <i class="fas fa-stop"></i> Stop
+                </button>
+              </div>
+              <?php endif; ?>
+
               <form method="post" action="update_trip_status.php" class="mt-3 update-trip-form">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="booking_id" value="<?= $active_trip['id'] ?>">
                 <?php if ($active_trip['status'] === 'Accepted'): ?>
                   <button type="submit" name="new_status" value="On the way" class="btn btn-warning">Mark as On The Way</button>
@@ -165,6 +237,7 @@ $trip_history = $history_stmt->fetchAll();
                     <p><strong>Destination:</strong> <?= htmlspecialchars($booking['destination']) ?></p>
                     <p><strong>Details:</strong><br><?= nl2br(htmlspecialchars($booking['emergency_details'])) ?></p>
                     <form method="post" action="accept_booking.php" class="mt-2 accept-booking-form">
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                       <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>">
                       <button type="submit" class="btn btn-success" <?= $status !== 'Available' ? 'disabled' : '' ?>>
                         <?= $status !== 'Available' ? 'Go Available to Accept' : 'Accept Request' ?>
@@ -212,6 +285,7 @@ $trip_history = $history_stmt->fetchAll();
             </div>
             <div class="card-body p-4">
               <form id="driver-profile-form">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                 <div class="mb-3">
                   <label class="form-label">Full Name</label>
                   <input type="text" class="form-control" name="full_name" value="<?= htmlspecialchars($driver_user['full_name'] ?? '') ?>" required>
@@ -239,6 +313,7 @@ $trip_history = $history_stmt->fetchAll();
             </div>
             <div class="card-body p-4">
               <form id="driver-status-form">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                 <div class="mb-3">
                   <label for="vehicle_type" class="form-label">Vehicle Type (e.g., ICU, Basic, Freezer)</label>
                   <input type="text" class="form-control" id="vehicle_type" name="vehicle_type" value="<?= htmlspecialchars($vehicle_type) ?>" required>
@@ -268,10 +343,12 @@ $trip_history = $history_stmt->fetchAll();
 
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <!-- Font Awesome -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <!-- Custom JS -->
-  <script src="js/script.js"></script>
+  <script src="js/script.js?v=<?= time() ?>"></script>
   <script>
     // Handle Header Status Quick Toggle
     function updateHeaderStatus(statusValue) {
@@ -280,6 +357,7 @@ $trip_history = $history_stmt->fetchAll();
       
       const formData = new FormData();
       formData.append('status', statusValue);
+      formData.append('csrf_token', document.querySelector('#header-status-form input[name="csrf_token"]').value);
       
       fetch('update_driver_status.php', { method: 'POST', body: formData })
       .then(response => response.json())
@@ -407,6 +485,153 @@ $trip_history = $history_stmt->fetchAll();
             });
         });
     });
+
+    // Trip progress update
+    const progressForm = document.getElementById('trip-progress-form');
+    if (progressForm) {
+      const startAutoBtn = document.getElementById('auto-sim-start-btn');
+      const stopAutoBtn = document.getElementById('auto-sim-stop-btn');
+      const progressInput = document.getElementById('trip-progress-input');
+      const etaInput = document.getElementById('trip-eta-input');
+      const progressBar = document.getElementById('driver-progress-bar');
+      const progressLabel = document.getElementById('driver-progress-label');
+      const progressLive = document.getElementById('trip-progress-live');
+      const etaLabel = document.getElementById('driver-eta-label');
+      const bookingId = progressForm.querySelector('input[name="booking_id"]').value;
+      const csrfToken = progressForm.querySelector('input[name="csrf_token"]').value;
+      let autoSimTimer = null;
+
+      const pLat = <?= json_encode($active_trip['pickup_lat'] ?? null) ?>;
+      const pLng = <?= json_encode($active_trip['pickup_lng'] ?? null) ?>;
+      const dLat = <?= json_encode($active_trip['dest_lat'] ?? null) ?>;
+      const dLng = <?= json_encode($active_trip['dest_lng'] ?? null) ?>;
+
+      if (pLat && pLng && dLat && dLng) {
+          window.driverMapController = window.initDashboardMap('driver-map', parseFloat(pLat), parseFloat(pLng), parseFloat(dLat), parseFloat(dLng));
+          if (window.driverMapController) {
+              window.driverMapController.updateProgress(parseInt(progressInput.value || '0', 10));
+          }
+      }
+
+      function setAutoSimButtons(isRunning) {
+        if (!startAutoBtn || !stopAutoBtn) return;
+        startAutoBtn.disabled = isRunning;
+        stopAutoBtn.disabled = !isRunning;
+      }
+
+      function applyProgressUI(progress, eta) {
+        progressInput.value = progress;
+        progressBar.style.width = progress + '%';
+        progressBar.setAttribute('aria-valuenow', progress);
+        progressLabel.textContent = progress + '%';
+        if (progressLive) progressLive.textContent = progress + '%';
+        etaLabel.textContent = (eta === null ? '-' : (eta + ' min'));
+        if (eta !== null) etaInput.value = eta;
+        
+        if (window.driverMapController) {
+            window.driverMapController.updateProgress(progress);
+        }
+      }
+
+      function saveTripProgress(progress, eta, silent) {
+        const formData = new FormData();
+        formData.append('booking_id', bookingId);
+        formData.append('progress', progress);
+        formData.append('eta_minutes', eta);
+        formData.append('csrf_token', csrfToken);
+
+        return fetch('update_trip_progress.php', { method: 'POST', body: formData })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success) {
+              throw new Error(data.message || 'Failed to update progress');
+            }
+            const nextProgress = parseInt(data.data.progress, 10);
+            const nextEta = data.data.eta_minutes;
+            applyProgressUI(nextProgress, nextEta);
+            if (!silent) showToast('Trip progress updated', 'success');
+            return { progress: nextProgress, eta: nextEta };
+          });
+      }
+
+      progressForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('trip-progress-btn');
+        const progress = Math.max(0, Math.min(100, parseInt(progressInput.value || '0', 10)));
+        const eta = Math.max(0, parseInt(etaInput.value || '0', 10));
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        saveTripProgress(progress, eta, false)
+          .then(() => {
+            btn.disabled = false;
+            btn.textContent = 'Save';
+          })
+          .catch((err) => {
+            btn.disabled = false;
+            btn.textContent = 'Save';
+            showToast(err.message || 'An error occurred while saving progress', 'error');
+          });
+      });
+
+      if (progressInput) {
+        progressInput.addEventListener('input', function() {
+          progressBar.style.width = this.value + '%';
+          progressBar.setAttribute('aria-valuenow', this.value);
+          progressLabel.textContent = this.value + '%';
+          if (progressLive) progressLive.textContent = this.value + '%';
+        });
+      }
+
+      if (startAutoBtn && stopAutoBtn) {
+        startAutoBtn.addEventListener('click', function() {
+          if (autoSimTimer) return;
+
+          setAutoSimButtons(true);
+          showToast('Auto simulate started', 'info');
+
+          autoSimTimer = setInterval(() => {
+            const currentProgress = Math.max(0, Math.min(100, parseInt(progressInput.value || '0', 10)));
+            const currentEta = Math.max(0, parseInt(etaInput.value || '0', 10));
+
+            if (currentProgress >= 100) {
+              clearInterval(autoSimTimer);
+              autoSimTimer = null;
+              setAutoSimButtons(false);
+              return;
+            }
+
+            const step = Math.floor(Math.random() * 8) + 4; // 4-11%
+            const nextProgress = Math.min(100, currentProgress + step);
+            const nextEta = Math.max(0, currentEta - Math.ceil(step / 4));
+
+            saveTripProgress(nextProgress, nextEta, true)
+              .then((result) => {
+                if (result.progress >= 100) {
+                  clearInterval(autoSimTimer);
+                  autoSimTimer = null;
+                  setAutoSimButtons(false);
+                  showToast('Auto simulation complete. You can mark as Arrived.', 'success');
+                }
+              })
+              .catch((err) => {
+                clearInterval(autoSimTimer);
+                autoSimTimer = null;
+                setAutoSimButtons(false);
+                showToast(err.message || 'Auto simulation stopped due to error', 'error');
+              });
+          }, 6000);
+        });
+
+        stopAutoBtn.addEventListener('click', function() {
+          if (!autoSimTimer) return;
+          clearInterval(autoSimTimer);
+          autoSimTimer = null;
+          setAutoSimButtons(false);
+          showToast('Auto simulate stopped', 'warning');
+        });
+      }
+    }
   </script>
 </body>
 </html>

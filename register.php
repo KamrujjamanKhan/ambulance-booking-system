@@ -24,6 +24,7 @@ $form_values = [
 $register_error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
     $form_values['fullname'] = trim($_POST['fullname'] ?? '');
     $form_values['phone']    = trim($_POST['phone'] ?? '');
     $form_values['email']    = trim($_POST['email'] ?? '');
@@ -267,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form id="registerForm" class="needs-validation" method="post" action="register.php" novalidate>
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
           <!-- Full Name -->
           <div class="form-group">
             <label for="fullname">Full Name</label>

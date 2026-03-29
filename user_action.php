@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: user_dashboard.php');
   exit;
 }
+require_csrf();
 
 $action = $_POST['action'] ?? '';
 $patient_id = $_SESSION['user_id'];
@@ -28,7 +29,7 @@ try {
     exit;
   }
 } catch (Exception $e) {
-  header("Location: user_dashboard.php?err=" . urlencode("Action failed: " . $e->getMessage()));
+  header("Location: user_dashboard.php?err=" . urlencode("Action failed. Please try again."));
   exit;
 }
 

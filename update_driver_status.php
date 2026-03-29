@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
   exit;
 }
+require_csrf(true);
 
 $driver_id = $_SESSION['user_id'];
 $vehicle_type = $_POST['vehicle_type'] ?? '';

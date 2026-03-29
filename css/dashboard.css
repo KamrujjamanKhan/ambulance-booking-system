@@ -267,6 +267,52 @@ body {
     border-bottom: none;
 }
 
+.sim-track-box {
+    background: linear-gradient(145deg, #0f172a, #111827);
+    color: #e2e8f0;
+    border-radius: 12px;
+    border: 1px solid #1e293b;
+    padding: 14px;
+}
+
+.sim-track-box .text-muted {
+    color: #94a3b8 !important;
+}
+
+.sim-route {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.route-point {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #93c5fd;
+}
+
+.route-line {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #38bdf8, #22c55e);
+    position: relative;
+}
+
+.route-ambulance {
+    position: absolute;
+    top: -13px;
+    left: 0;
+    transform: translateX(-50%);
+    color: #f8fafc;
+    transition: left 0.3s ease;
+    text-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+}
+
+.route-ambulance i {
+    margin-right: 0;
+}
+
 .badge {
     padding: 6px 10px;
     font-weight: 500;

@@ -128,44 +128,6 @@ class FormValidator {
     }
   }
 
-  handleLogin() {
-    const email = this.form.querySelector('#email').value;
-    const password = this.form.querySelector('#password').value;
-    const rememberMe = this.form.querySelector('#remember').checked;
-
-    showLoadingOverlay();
-
-    // TODO: Replace with actual API endpoint
-    // POST /api/login.php
-    setTimeout(() => {
-      hideLoadingOverlay();
-      showToast('Login successful! Redirecting...', 'success');
-      setTimeout(() => {
-        window.location.href = 'user_dashboard.php';
-      }, 1500);
-    }, 1500);
-  }
-
-  handleRegister() {
-    const fullName = this.form.querySelector('#fullname').value;
-    const phone = this.form.querySelector('#phone').value;
-    const email = this.form.querySelector('#email').value;
-    const password = this.form.querySelector('#password').value;
-    const role = this.form.querySelector('#role').value;
-
-    showLoadingOverlay();
-
-    // TODO: Replace with actual API endpoint
-    // POST /api/register.php
-    setTimeout(() => {
-      hideLoadingOverlay();
-      showToast('Registration successful! Redirecting to login...', 'success');
-      setTimeout(() => {
-        window.location.href = 'login.php';
-      }, 1500);
-    }, 1500);
-  }
-
   handleContact() {
     const name = this.form.querySelector('#name').value;
     const email = this.form.querySelector('#email').value;
@@ -301,9 +263,14 @@ function initializeMap() {
         }).addTo(map).bindPopup('Pickup (Drag to adjust)').openPopup();
 
         pickupMarker.on('dragend', function (event) {
-          geocodeAndUpdate(event.target.getLatLng(), pickupInput, 'Pickup');
+          const latlng = event.target.getLatLng();
+          document.getElementById('pickup_lat').value = latlng.lat;
+          document.getElementById('pickup_lng').value = latlng.lng;
+          geocodeAndUpdate(latlng, pickupInput, 'Pickup');
         });
 
+        document.getElementById('pickup_lat').value = e.latlng.lat;
+        document.getElementById('pickup_lng').value = e.latlng.lng;
         geocodeAndUpdate(e.latlng, pickupInput, 'Pickup');
         selectingPickup = false;
       } else {
@@ -318,9 +285,14 @@ function initializeMap() {
         }).addTo(map).bindPopup('Destination (Drag to adjust)').openPopup();
 
         destinationMarker.on('dragend', function (event) {
-          geocodeAndUpdate(event.target.getLatLng(), destinationInput, 'Destination');
+          const latlng = event.target.getLatLng();
+          document.getElementById('dest_lat').value = latlng.lat;
+          document.getElementById('dest_lng').value = latlng.lng;
+          geocodeAndUpdate(latlng, destinationInput, 'Destination');
         });
 
+        document.getElementById('dest_lat').value = e.latlng.lat;
+        document.getElementById('dest_lng').value = e.latlng.lng;
         geocodeAndUpdate(e.latlng, destinationInput, 'Destination');
         selectingPickup = true;
       }
@@ -333,77 +305,84 @@ function initializeMap() {
     if (dInput) dInput.addEventListener('focus', () => selectingPickup = false);
 
   } else {
-    // Simple map handler for driver dashboard (only updating current location)
-    // Driver dashboard usually doesn't need to click to pick locations, but just in case
+    // Dashboard map handler is called directly from the PHP files when needed
   }
 }
 
-// ============================================
-// DRIVER LOCATION UPDATE
-// ============================================
+// Global function to initialize dashboard map
+window.initDashboardMap = function(mapId, startLat, startLng, endLat, endLng) {
+  if (!document.getElementById(mapId)) return null;
+  const dashMap = L.map(mapId).setView([startLat, startLng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(dashMap);
+  
+  const startIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    iconSize: [25, 41], iconAnchor: [12, 41]
+  });
+  const endIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    iconSize: [25, 41], iconAnchor: [12, 41]
+  });
+  const ambulanceIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    iconSize: [25, 41], iconAnchor: [12, 41]
+  });
 
-function updateDriverLocation() {
-  if (navigator.geolocation) {
-    showLoadingOverlay();
+  L.marker([startLat, startLng], {icon: startIcon}).addTo(dashMap).bindPopup('Pickup');
+  L.marker([endLat, endLng], {icon: endIcon}).addTo(dashMap).bindPopup('Destination');
+  
+  const ambMarker = L.marker([startLat, startLng], {icon: ambulanceIcon, zIndexOffset: 1000}).addTo(dashMap).bindPopup('Ambulance');
+  
+  let routePolyline = null;
+  let decodedPath = [];
 
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        // TODO: Replace with actual API endpoint
-        // POST /api/update_location.php
-
-        hideLoadingOverlay();
-        showToast(`Location updated: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, 'success');
-
-        // Update map if it exists
-        if (map) {
-          map.setView([lat, lng], 15);
-          L.marker([lat, lng]).addTo(map).bindPopup('Your current location');
-        }
-      },
-      function (error) {
-        hideLoadingOverlay();
-        showToast('Unable to get your location. Please enable location services.', 'error');
+  // Fetch route from OSRM
+  fetch(`https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`)
+    .then(res => res.json())
+    .then(data => {
+      if(data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates; // [lng, lat]
+        decodedPath = coords.map(c => [c[1], c[0]]); // Leaflet needs [lat, lng]
+        routePolyline = L.polyline(decodedPath, {color: 'blue', weight: 4}).addTo(dashMap);
+        dashMap.fitBounds(routePolyline.getBounds(), {padding: [30, 30]});
       }
-    );
-  } else {
-    showToast('Geolocation is not supported by your browser.', 'error');
-  }
-}
+    });
 
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
+  setTimeout(() => dashMap.invalidateSize(), 500);
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('bn-BD', {
-    style: 'currency',
-    currency: 'BDT'
-  }).format(amount);
-}
-
-function formatDate(date) {
-  return new Intl.DateTimeFormat('bn-BD', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(date));
-}
-
-function getStatusBadgeClass(status) {
-  const statusMap = {
-    'pending': 'badge-pending',
-    'accepted': 'badge-accepted',
-    'on-way': 'badge-on-way',
-    'on_way': 'badge-on-way',
-    'completed': 'badge-completed',
-    'cancelled': 'badge-cancelled'
+  return {
+    map: dashMap,
+    ambMarker: ambMarker,
+    updateProgress: function(progressPercent) {
+      if(!decodedPath || decodedPath.length === 0) return;
+      const progress = Math.min(Math.max(progressPercent, 0), 100) / 100.0;
+      
+      // Calculate total distance (simple segmented proportional distance)
+      let totalDist = 0;
+      const segDists = [];
+      for(let i=0; i<decodedPath.length-1; i++) {
+        const d = dashMap.distance(decodedPath[i], decodedPath[i+1]);
+        segDists.push(d);
+        totalDist += d;
+      }
+      
+      const targetDist = totalDist * progress;
+      let currDist = 0;
+      for(let i=0; i<decodedPath.length-1; i++) {
+        if(currDist + segDists[i] >= targetDist) {
+          const segProgress = (targetDist - currDist) / segDists[i];
+          const lat = decodedPath[i][0] + (decodedPath[i+1][0] - decodedPath[i][0]) * segProgress;
+          const lng = decodedPath[i][1] + (decodedPath[i+1][1] - decodedPath[i][1]) * segProgress;
+          ambMarker.setLatLng([lat, lng]);
+          return;
+        }
+        currDist += segDists[i];
+      }
+      if(decodedPath.length > 0) {
+        ambMarker.setLatLng(decodedPath[decodedPath.length-1]);
+      }
+    }
   };
-  return statusMap[status.toLowerCase()] || 'badge-pending';
 }
 
 function logout() {

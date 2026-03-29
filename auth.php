@@ -8,6 +8,47 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/config.php';
 
 /**
+ * Get or create CSRF token for the session.
+ */
+function csrf_token(): string
+{
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Validate submitted CSRF token.
+ */
+function csrf_validate(?string $token): bool
+{
+    $sessionToken = $_SESSION['csrf_token'] ?? '';
+    return is_string($token) && is_string($sessionToken) && $sessionToken !== '' && hash_equals($sessionToken, $token);
+}
+
+/**
+ * Abort request when CSRF token is invalid.
+ */
+function require_csrf(bool $jsonResponse = false): void
+{
+    $token = $_POST['csrf_token'] ?? '';
+    if (csrf_validate($token)) {
+        return;
+    }
+
+    if ($jsonResponse) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh and try again.']);
+    } else {
+        http_response_code(403);
+        echo 'Invalid CSRF token. Please go back and try again.';
+    }
+    exit;
+}
+
+/**
  * Find a user by email or phone.
  */
 function find_user_by_identifier(string $identifier): ?array
@@ -51,6 +92,7 @@ function create_user(string $name, string $email, string $phone, string $passwor
  */
 function login_user(array $user): void
 {
+    session_regenerate_id(true);
     $_SESSION['user_id']   = $user['id'];
     $_SESSION['user_name'] = $user['full_name'];
     $_SESSION['user_role'] = $user['role'];

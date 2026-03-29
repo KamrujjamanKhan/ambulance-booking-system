@@ -54,7 +54,7 @@ $drivers = db()->query("SELECT * FROM users WHERE role = 'driver' ORDER BY creat
       </div>
       <ul class="sidebar-menu nav flex-column" id="adminTab" role="tablist">
         <li class="nav-item" role="presentation">
-          <a class="nav-link active" id="dashboard-tab" data-bs-toggle="pill" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="true" style="cursor: pointer;">
+          <a class="nav-link" id="dashboard-tab" data-bs-toggle="pill" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="false" style="cursor: pointer;">
             <i class="fas fa-chart-pie me-2"></i>
             Dashboard
           </a>
@@ -78,7 +78,7 @@ $drivers = db()->query("SELECT * FROM users WHERE role = 'driver' ORDER BY creat
           </a>
         </li>
         <li class="nav-item" role="presentation">
-          <a class="nav-link" id="bookings-tab" data-bs-toggle="pill" data-bs-target="#bookings" type="button" role="tab" aria-controls="bookings" aria-selected="false" style="cursor: pointer;">
+          <a class="nav-link active" id="bookings-tab" data-bs-toggle="pill" data-bs-target="#bookings" type="button" role="tab" aria-controls="bookings" aria-selected="true" style="cursor: pointer;">
             <i class="fas fa-list me-2"></i>
             All Bookings
           </a>
@@ -125,7 +125,7 @@ $drivers = db()->query("SELECT * FROM users WHERE role = 'driver' ORDER BY creat
         <?php endif; ?>
 
         <!-- Dashboard Overview -->
-        <div class="tab-pane fade show active" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+        <div class="tab-pane fade" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
           <h4 class="mb-4 fw-bold text-dark">System Overview</h4>
           <div class="row g-4 mb-5">
             <div class="col-md-3">
@@ -168,7 +168,7 @@ $drivers = db()->query("SELECT * FROM users WHERE role = 'driver' ORDER BY creat
         </div>
 
       <!-- Recent Bookings Table -->
-      <div class="tab-pane fade" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
+      <div class="tab-pane fade show active" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
         <h4 class="mb-4">Recent Bookings</h4>
         <div class="data-card">
           <div class="card-body">
@@ -210,6 +210,7 @@ $drivers = db()->query("SELECT * FROM users WHERE role = 'driver' ORDER BY creat
                       <td>
                         <?php if ($b['status'] === 'Pending'): ?>
                           <form method="post" action="admin_action.php" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
                             <input type="hidden" name="action" value="cancel_booking">
                             <input type="hidden" name="booking_id" value="<?= $b['id'] ?>">
                             <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Cancel this booking?');">Cancel</button>
